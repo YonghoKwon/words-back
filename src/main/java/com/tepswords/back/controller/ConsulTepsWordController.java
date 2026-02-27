@@ -1,8 +1,11 @@
 package com.tepswords.back.controller;
 
 
+import com.tepswords.back.dto.ApiWordDto;
 import com.tepswords.back.model.ConsulTepsWord;
+import com.tepswords.back.model.TepsWord;
 import com.tepswords.back.service.ConsulTepsWordService;
+import com.tepswords.back.service.TepsWordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,10 +17,12 @@ import java.util.List;
 public class ConsulTepsWordController {
 
     private final ConsulTepsWordService tepsWordService;
+    private final TepsWordService regularWordService;
 
     @Autowired
-    public ConsulTepsWordController(ConsulTepsWordService tepsWordService) {
+    public ConsulTepsWordController(ConsulTepsWordService tepsWordService, TepsWordService regularWordService) {
         this.tepsWordService = tepsWordService;
+        this.regularWordService = regularWordService;
     }
 
     // 모든 단어 조회
@@ -40,15 +45,39 @@ public class ConsulTepsWordController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 랜덤 단어 가져오기
+    // 랜덤 단어 가져오기 (type: concepts | regular)
     @GetMapping("/random")
-    public ResponseEntity<ConsulTepsWord> getRandomWord() {
-        ConsulTepsWord randomWord = tepsWordService.getRandomWord();
-        if (randomWord != null) {
-            return ResponseEntity.ok(randomWord);
-        } else {
+    public ResponseEntity<ApiWordDto> getRandomWord(
+            @RequestParam(defaultValue = "concepts") String type,
+            @RequestParam(required = false) String partOfSpeech
+    ) {
+        if ("regular".equalsIgnoreCase(type)) {
+            TepsWord randomRegular = regularWordService.getRandomWord();
+            if (randomRegular == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(new ApiWordDto(
+                    randomRegular.getSeq(),
+                    randomRegular.getWord(),
+                    "",
+                    randomRegular.getMeaning()
+            ));
+        }
+
+        ConsulTepsWord randomWord = (partOfSpeech == null || partOfSpeech.isBlank())
+                ? tepsWordService.getRandomWord()
+                : tepsWordService.getRandomWordByPartOfSpeech(partOfSpeech);
+
+        if (randomWord == null) {
             return ResponseEntity.notFound().build();
         }
+
+        return ResponseEntity.ok(new ApiWordDto(
+                randomWord.getSeq(),
+                randomWord.getWord(),
+                randomWord.getPartOfSpeech(),
+                randomWord.getMeaning()
+        ));
     }
 
     // seq 범위로 단어 조회 (예: 1~20)
@@ -70,15 +99,13 @@ public class ConsulTepsWordController {
         return ResponseEntity.ok(words);
     }
 
-    // ConsulTepsWordController.java에 추가
+    // 하위 호환: 기존 경로 유지
     @GetMapping("/random/partOfSpeech/{partOfSpeech}")
-    public ResponseEntity<ConsulTepsWord> getRandomWordByPartOfSpeech(@PathVariable String partOfSpeech) {
-        ConsulTepsWord randomWord = tepsWordService.getRandomWordByPartOfSpeech(partOfSpeech);
-        if (randomWord != null) {
-            return ResponseEntity.ok(randomWord);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<ApiWordDto> getRandomWordByPartOfSpeech(
+            @PathVariable String partOfSpeech,
+            @RequestParam(defaultValue = "concepts") String type
+    ) {
+        return getRandomWord(type, partOfSpeech);
     }
 }
 
