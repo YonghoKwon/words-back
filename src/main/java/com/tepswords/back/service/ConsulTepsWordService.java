@@ -48,9 +48,11 @@ public class ConsulTepsWordService {
         return tepsWordRepository.findBySeqBetweenOrderBySeqAsc(startSeq, endSeq);
     }
 
-    // ConsulTepsWordService.java에 추가
     public ConsulTepsWord getRandomWordByPartOfSpeech(String partOfSpeech) {
         return tepsWordRepository.findRandomWordByPartOfSpeech(partOfSpeech);
     }
-}
 
+    public List<ConsulTepsWord> getQuizDistractors(Integer seq, String partOfSpeech, int limit) {
+        return tepsWordRepository.findQuizDistractors(seq, partOfSpeech, limit);
+    }
+}
