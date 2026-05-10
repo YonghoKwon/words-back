@@ -15,6 +15,8 @@ import java.util.List;
 @Service
 public class WordProgressService {
 
+    private static final String EMPTY_PART_OF_SPEECH = "-";
+
     private final WordBookmarkRepository wordBookmarkRepository;
     private final WordWrongAnswerRepository wordWrongAnswerRepository;
 
@@ -24,7 +26,7 @@ public class WordProgressService {
     }
 
     public WordBookmark saveBookmark(WordActionRequest request) {
-        validateRequest(request);
+        normalizeAndValidateRequest(request);
 
         return wordBookmarkRepository
                 .findByWordTypeAndSeqAndWordAndPartOfSpeechAndMeaning(
@@ -42,7 +44,7 @@ public class WordProgressService {
     }
 
     public void removeBookmark(WordActionRequest request) {
-        validateRequest(request);
+        normalizeAndValidateRequest(request);
 
         wordBookmarkRepository
                 .findByWordTypeAndSeqAndWordAndPartOfSpeechAndMeaning(
@@ -52,7 +54,7 @@ public class WordProgressService {
     }
 
     public WordWrongAnswer markWrong(WordActionRequest request) {
-        validateRequest(request);
+        normalizeAndValidateRequest(request);
 
         return wordWrongAnswerRepository
                 .findByWordTypeAndSeqAndWordAndPartOfSpeechAndMeaning(
@@ -77,7 +79,7 @@ public class WordProgressService {
     }
 
     public WordProgressResponse getProgress(WordActionRequest request) {
-        validateRequest(request);
+        normalizeAndValidateRequest(request);
 
         boolean bookmarked = wordBookmarkRepository
                 .findByWordTypeAndSeqAndWordAndPartOfSpeechAndMeaning(
@@ -103,13 +105,21 @@ public class WordProgressService {
         return wordWrongAnswerRepository.findTop100ByOrderByLastWrongAtDesc();
     }
 
-    private void validateRequest(WordActionRequest request) {
+    private void normalizeAndValidateRequest(WordActionRequest request) {
         if (request == null || request.getSeq() == null ||
                 !StringUtils.hasText(request.getWordType()) ||
                 !StringUtils.hasText(request.getWord()) ||
-                !StringUtils.hasText(request.getPartOfSpeech()) ||
                 !StringUtils.hasText(request.getMeaning())) {
-            throw new IllegalArgumentException("wordType, seq, word, partOfSpeech, meaning 값이 모두 필요합니다.");
+            throw new IllegalArgumentException("wordType, seq, word, meaning 값이 필요합니다.");
         }
+
+        if (!StringUtils.hasText(request.getPartOfSpeech())) {
+            request.setPartOfSpeech(EMPTY_PART_OF_SPEECH);
+        }
+
+        request.setWordType(request.getWordType().trim());
+        request.setWord(request.getWord().trim());
+        request.setPartOfSpeech(request.getPartOfSpeech().trim());
+        request.setMeaning(request.getMeaning().trim());
     }
 }
