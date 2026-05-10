@@ -48,6 +48,10 @@ public class TepsWordService {
         return tepsWordRepository.findRandomWord().orElse(null);
     }
 
+    public List<TepsWord> getQuizDistractors(Integer seq, int limit) {
+        return tepsWordRepository.findQuizDistractors(seq, limit);
+    }
+
     // 단어 저장(추가/수정)
     public TepsWord saveWord(TepsWord tepsWord) {
         return tepsWordRepository.save(tepsWord);
