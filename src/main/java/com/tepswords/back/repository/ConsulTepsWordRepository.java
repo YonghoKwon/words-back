@@ -27,8 +27,20 @@ public interface ConsulTepsWordRepository extends JpaRepository<ConsulTepsWord, 
     // seq 범위로 검색
     List<ConsulTepsWord> findBySeqBetweenOrderBySeqAsc(Integer startSeq, Integer endSeq);
 
-    // ConsulTepsWordRepository.java에 추가
     @Query(value = "SELECT * FROM consulteps_words WHERE part_of_speech = :partOfSpeech ORDER BY RAND() LIMIT 1", nativeQuery = true)
     ConsulTepsWord findRandomWordByPartOfSpeech(@Param("partOfSpeech") String partOfSpeech);
-}
 
+    @Query(value = """
+            SELECT *
+            FROM consulteps_words
+            WHERE seq <> :seq
+              AND (:partOfSpeech IS NULL OR :partOfSpeech = '' OR part_of_speech = :partOfSpeech)
+            ORDER BY RAND()
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<ConsulTepsWord> findQuizDistractors(
+            @Param("seq") Integer seq,
+            @Param("partOfSpeech") String partOfSpeech,
+            @Param("limit") int limit
+    );
+}

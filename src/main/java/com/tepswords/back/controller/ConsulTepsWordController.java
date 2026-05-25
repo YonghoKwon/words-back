@@ -1,6 +1,5 @@
 package com.tepswords.back.controller;
 
-
 import com.tepswords.back.dto.ApiWordDto;
 import com.tepswords.back.model.ConsulTepsWord;
 import com.tepswords.back.model.TepsWord;
@@ -16,6 +15,10 @@ import java.util.List;
 @RequestMapping("/api/words")
 public class ConsulTepsWordController {
 
+    private static final int MAX_RANGE_SIZE = 200;
+    private static final int DEFAULT_QUIZ_CHOICE_LIMIT = 8;
+    private static final int MAX_QUIZ_CHOICE_LIMIT = 20;
+
     private final ConsulTepsWordService tepsWordService;
     private final TepsWordService regularWordService;
 
@@ -25,11 +28,12 @@ public class ConsulTepsWordController {
         this.regularWordService = regularWordService;
     }
 
-    // 모든 단어 조회
+    // 모든 컨설텝스 단어 조회
     @GetMapping
-    public ResponseEntity<List<ConsulTepsWord>> getAllWords() {
-        List<ConsulTepsWord> words = tepsWordService.getAllWords();
-        return ResponseEntity.ok(words);
+    public ResponseEntity<List<ApiWordDto>> getAllWords() {
+        return ResponseEntity.ok(tepsWordService.getAllWords().stream()
+                .map(this::toApiWordDto)
+                .toList());
     }
 
     // ID로 단어 조회
@@ -56,12 +60,7 @@ public class ConsulTepsWordController {
             if (randomRegular == null) {
                 return ResponseEntity.notFound().build();
             }
-            return ResponseEntity.ok(new ApiWordDto(
-                    randomRegular.getSeq(),
-                    randomRegular.getWord(),
-                    "",
-                    randomRegular.getMeaning()
-            ));
+            return ResponseEntity.ok(toApiWordDto(randomRegular));
         }
 
         ConsulTepsWord randomWord = (partOfSpeech == null || partOfSpeech.isBlank())
@@ -72,31 +71,52 @@ public class ConsulTepsWordController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(new ApiWordDto(
-                randomWord.getSeq(),
-                randomWord.getWord(),
-                randomWord.getPartOfSpeech(),
-                randomWord.getMeaning()
-        ));
+        return ResponseEntity.ok(toApiWordDto(randomWord));
     }
 
-    // seq 범위로 단어 조회 (예: 1~20)
+    // seq 범위로 단어 조회 (예: 1~20, type: concepts | regular)
     @GetMapping("/range")
-    public ResponseEntity<List<ConsulTepsWord>> getWordsBySeqRange(
+    public ResponseEntity<List<ApiWordDto>> getWordsBySeqRange(
+            @RequestParam(defaultValue = "concepts") String type,
             @RequestParam(defaultValue = "1") Integer startSeq,
             @RequestParam(defaultValue = "20") Integer endSeq) {
 
-        // 범위 유효성 검사
-        if (startSeq < 1) {
-            startSeq = 1;
+        int safeStartSeq = Math.max(1, startSeq == null ? 1 : startSeq);
+        int safeEndSeq = Math.max(safeStartSeq, endSeq == null ? safeStartSeq + 19 : endSeq);
+        if (safeEndSeq - safeStartSeq + 1 > MAX_RANGE_SIZE) {
+            safeEndSeq = safeStartSeq + MAX_RANGE_SIZE - 1;
         }
 
-        if (endSeq < startSeq) {
-            endSeq = startSeq;
+        if ("regular".equalsIgnoreCase(type)) {
+            return ResponseEntity.ok(regularWordService.getWordsBySeqRange(safeStartSeq, safeEndSeq).stream()
+                    .map(this::toApiWordDto)
+                    .toList());
         }
 
-        List<ConsulTepsWord> words = tepsWordService.getWordsBySeqRange(startSeq, endSeq);
-        return ResponseEntity.ok(words);
+        return ResponseEntity.ok(tepsWordService.getWordsBySeqRange(safeStartSeq, safeEndSeq).stream()
+                .map(this::toApiWordDto)
+                .toList());
+    }
+
+    // 객관식 퀴즈 보기 생성용 후보 조회
+    @GetMapping("/quiz-choices")
+    public ResponseEntity<List<ApiWordDto>> getQuizChoices(
+            @RequestParam(defaultValue = "concepts") String type,
+            @RequestParam Integer seq,
+            @RequestParam(required = false) String partOfSpeech,
+            @RequestParam(defaultValue = "8") Integer limit) {
+
+        int safeLimit = Math.max(2, Math.min(limit == null ? DEFAULT_QUIZ_CHOICE_LIMIT : limit, MAX_QUIZ_CHOICE_LIMIT));
+
+        if ("regular".equalsIgnoreCase(type)) {
+            return ResponseEntity.ok(regularWordService.getQuizDistractors(seq, safeLimit).stream()
+                    .map(this::toApiWordDto)
+                    .toList());
+        }
+
+        return ResponseEntity.ok(tepsWordService.getQuizDistractors(seq, partOfSpeech, safeLimit).stream()
+                .map(this::toApiWordDto)
+                .toList());
     }
 
     // 하위 호환: 기존 경로 유지
@@ -107,5 +127,22 @@ public class ConsulTepsWordController {
     ) {
         return getRandomWord(type, partOfSpeech);
     }
-}
 
+    private ApiWordDto toApiWordDto(ConsulTepsWord word) {
+        return new ApiWordDto(
+                word.getSeq(),
+                word.getWord(),
+                word.getPartOfSpeech(),
+                word.getMeaning()
+        );
+    }
+
+    private ApiWordDto toApiWordDto(TepsWord word) {
+        return new ApiWordDto(
+                word.getSeq(),
+                word.getWord(),
+                "",
+                word.getMeaning()
+        );
+    }
+}
